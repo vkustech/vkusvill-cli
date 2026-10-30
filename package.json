@@ -1,6 +1,6 @@
 {
   "name": "vkusvill",
-  "version": "0.0.0-dev.1",
+  "version": "0.1.0",
   "description": "Experimental VkusVill client for the terminal, one example of what VkusVill's official MCP server makes possible: catalog, deals, recipes, shops and a cart with a QR code, drawn in text graphics",
   "author": "Anton Golub <golub.anton@gmail.com>",
   "repository": {
@@ -34,7 +34,8 @@
     "start": "node bin/vv.js",
     "test": "node test/check.mjs && node test/auth-check.mjs && node test/keys-check.mjs && node test/store-check.mjs && node test/load-check.mjs && node test/hostile-check.mjs",
     "snap": "node test/snap.js",
-    "prepublishOnly": "npm ci --ignore-scripts && npm test"
+    "prepublishOnly": "npm ci --ignore-scripts && npm test",
+    "release": "npx --yes zx-semrel@1.25.2"
   },
   "keywords": [
     "vkusvill",
