@@ -53,6 +53,19 @@ const LOGO = {
 
 export const LOGO_GLYPH = (c) => LOGO[c] ?? LOGO[" "];
 
+// QR modules with a quiet zone of 2: dark(row, col) over 0…size-1, false outside. The last text is kept,
+// since the cart dialog draws its code every frame.
+let qrLast = null;
+export function qrMatrix(text) {
+  if (qrLast?.text === text) return qrLast;
+  const q = qrcode(0, "L");
+  q.addData(text);
+  q.make();
+  const n = q.getModuleCount(), quiet = 2;
+  const dark = (r, c) => r >= quiet && c >= quiet && r < n + quiet && c < n + quiet && q.isDark(r - quiet, c - quiet);
+  return (qrLast = { text, size: n + quiet * 2, dark });
+}
+
 // VkusVill leaf, 10×7
 export const LEAF = [
   ".......###",
@@ -213,27 +226,28 @@ export class G {
 
   static bigPriceH = 5;
 
-  qr(x, y, text) {
-    const q = qrcode(0, "L");
-    q.addData(text);
-    q.make();
-    const n = q.getModuleCount();
-    const quiet = 2;
-    const size = n + quiet * 2;
-    this.bitmap(x, y, size, size + (size % 2), (px, py) => {
-      const r = py - quiet, c = px - quiet;
-      if (r < 0 || c < 0 || r >= n || c >= n) return T.white;
-      return q.isDark(r, c) ? T.black : T.white;
-    });
-    return { w: size, h: Math.ceil(size / 2) };
+  // QR code. A module is two cells filled with background, almost square: no glyphs, so it scans at any line spacing.
+  // `half`: two modules per cell, half the size, for small windows. Terminals that draw block glyphs from the font
+  // show the background in the line spacing; as ▄ the background is the upper module, so the spacing only makes it
+  // taller and the rows keep their order. As ▀ a strip of the lower module lands above the upper one and the code
+  // stops scanning (JetBrains, Terminal.app).
+  qr(x, y, text, half = false) {
+    const { size, dark } = qrMatrix(text);
+    const col = (r, c) => (dark(r, c) ? T.black : T.white);
+    if (half) {
+      for (let r = 0; r < size; r += 2) for (let c = 0; c < size; c++) {
+        const top = col(r, c), bot = col(r + 1, c);
+        this.s.cell(x + c, y + r / 2, top === bot ? " " : "▄", bot, top, 0);
+      }
+    } else {
+      for (let r = 0; r < size; r++) for (let c = 0; c < size * 2; c++) this.s.cell(x + c, y + r, " ", -1, col(r, c >> 1), 0);
+    }
+    return G.qrSize(text, half);
   }
 
-  static qrSize(text) {
-    const q = qrcode(0, "L");
-    q.addData(text);
-    q.make();
-    const size = q.getModuleCount() + 4;
-    return { w: size, h: Math.ceil(size / 2) };
+  static qrSize(text, half = false) {
+    const { size } = qrMatrix(text);
+    return half ? { w: size, h: Math.ceil(size / 2) } : { w: size * 2, h: size };
   }
 
   // Scrollbar to the right of a list

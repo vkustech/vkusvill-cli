@@ -1,6 +1,6 @@
 // Plain-output commands: tables, colored when stdout is a terminal, and --json for scripts.
 
-import qrcode from "qrcode-generator";
+import { qrMatrix } from "./ui/draw.js";
 import * as api from "./api.js";
 import { normalize, rub, compactNum, qtyText, lineTotal, plural } from "./product.js";
 import { store, CART_MAX, QTY_MAX } from "./store.js";
@@ -139,17 +139,26 @@ export async function shops(q, { json }) {
   if (d.meta?.has_more) out(dim(`  …и еще ${d.meta.total - (d.items?.length ?? 0)}`));
 }
 
+// The same code as in the app: a module is two cells filled with background, so line spacing cannot break it;
+// in a narrow terminal two modules per cell as ▄, which keeps scanning where ▀ does not (see G.qr).
 export function printQR(text) {
-  const q = qrcode(0, "L");
-  q.addData(text);
-  q.make();
-  const n = q.getModuleCount(), quiet = 2, size = n + quiet * 2;
-  const dark = (r, col) => r >= quiet && col >= quiet && r < n + quiet && col < n + quiet && q.isDark(r - quiet, col - quiet);
+  const { size, dark } = qrMatrix(text);
+  const cols = process.stdout.columns ?? Infinity;
+  const bg = (on) => `\x1b[48;5;${on ? 16 : 231}m`;
+  if (size * 2 + 2 <= cols) {
+    for (let y = 0; y < size; y++) {
+      let line = "  ";
+      for (let x = 0; x < size; x++) line += bg(dark(y, x)) + "  ";
+      out(line + "\x1b[0m");
+    }
+    return;
+  }
+  if (size + 2 > cols) return out(dim(`  Окно мало для QR-кода: нужно ${size + 2} колонок, сейчас ${cols}`));
   for (let y = 0; y < size; y += 2) {
     let line = "  ";
     for (let x = 0; x < size; x++) {
-      const top = dark(y, x), bot = y + 1 < size ? dark(y + 1, x) : false;
-      line += `\x1b[38;5;${top ? 16 : 231}m\x1b[48;5;${bot ? 16 : 231}m▀`;
+      const top = dark(y, x), bot = dark(y + 1, x);
+      line += top === bot ? bg(top) + " " : `\x1b[38;5;${bot ? 16 : 231}m${bg(top)}▄`;
     }
     out(line + "\x1b[0m");
   }

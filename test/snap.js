@@ -104,6 +104,9 @@ snap("11-cart");
 key("o");
 await until(() => app.overlays.at(-1)?.link || app.overlays.at(-1)?.error);
 snap("12-checkout");
+key("z"); // the other size of the QR code, when both fit
+await sleep(50);
+snap("12-checkout-z");
 await esc(); key("6");
 await sleep(300);
 snap("13-profile");
