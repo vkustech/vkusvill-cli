@@ -1,0 +1,12 @@
+# Placeholder: npm trusted publishing is bound to this workflow file. Tests and release come next.
+name: CI
+
+on: workflow_dispatch
+
+permissions: {}
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - run: "true"

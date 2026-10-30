@@ -1,0 +1,58 @@
+{
+  "name": "vkusvill",
+  "version": "0.0.0-dev.1",
+  "description": "Experimental VkusVill client for the terminal, one example of what VkusVill's official MCP server makes possible: catalog, deals, recipes, shops and a cart with a QR code, drawn in text graphics",
+  "author": "Anton Golub <golub.anton@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vkustech/vkusvill-cli.git"
+  },
+  "homepage": "https://github.com/vkustech/vkusvill-cli#readme",
+  "bugs": {
+    "url": "https://github.com/vkustech/vkusvill-cli/issues"
+  },
+  "type": "module",
+  "bin": {
+    "vkusvill": "bin/vv.js",
+    "vv": "bin/vv.js"
+  },
+  "exports": {
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "README.en.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node bin/vv.js",
+    "test": "node test/check.mjs && node test/auth-check.mjs && node test/keys-check.mjs && node test/store-check.mjs && node test/load-check.mjs && node test/hostile-check.mjs",
+    "snap": "node test/snap.js",
+    "prepublishOnly": "npm ci --ignore-scripts && npm test"
+  },
+  "keywords": [
+    "vkusvill",
+    "вкусвилл",
+    "tui",
+    "cli",
+    "terminal",
+    "grocery",
+    "mcp",
+    "qr"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@jsquash/webp": "1.5.0",
+    "qrcode-generator": "1.5.2"
+  },
+  "bundleDependencies": [
+    "@jsquash/webp",
+    "qrcode-generator"
+  ]
+}
