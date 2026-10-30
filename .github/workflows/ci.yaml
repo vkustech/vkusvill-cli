@@ -1,12 +1,112 @@
-# Placeholder: npm trusted publishing is bound to this workflow file. Tests and release come next.
+# npm trusted publishing is bound to this filename: ci.yaml.
 name: CI
 
-on: workflow_dispatch
+on:
+  push:
+    branches: [main]
+  pull_request:
 
 permissions: {}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  # Replace superseded checks while allowing release pushes to finish.
+  cancel-in-progress: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}
+
 jobs:
-  noop:
+  test:
+    name: Test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-      - run: "true"
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: npm pack --ignore-scripts
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: package
+          path: vkusvill-*.tgz
+          retention-days: 1
+          if-no-files-found: error
+
+  smoke:
+    name: Smoke (${{ matrix.os }}, Node ${{ matrix.node }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, node: 26 }
+          - { os: ubuntu-latest, node: 26 }
+          - { os: ubuntu-latest, node: 20 } # the lowest supported
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: package
+
+      # The tarball built above, with its dependencies bundled: nothing is fetched from the registry
+      - run: npm install --global --ignore-scripts ./vkusvill-*.tgz # zizmor: ignore[adhoc-packages]
+      - run: node test/smoke.mjs "$(npm root --global)/vkusvill"
+
+  release:
+    name: Release
+    needs: smoke
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: release-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      contents: write # the release commit, tag and GitHub release
+      packages: write # zx-semrel also publishes to GitHub Packages
+      id-token: write # OIDC to npm: no token, with provenance
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      # The bundled dependencies ship inside the tarball, so they are installed, from the lockfile and without
+      # install scripts. Tests ran in the jobs above: prepublishOnly is skipped here with every other script.
+      - run: npm ci --ignore-scripts
+
+      - name: Release via zx-semrel
+        env:
+          NPM_OIDC: true
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_USER: x-access-token
+          GIT_BRANCH: main
+          npm_config_ignore_scripts: true
+        run: npm run release
