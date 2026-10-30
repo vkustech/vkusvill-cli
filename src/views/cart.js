@@ -280,49 +280,102 @@ class Checkout {
     if (!this.link) return;
     if (h === "o" || h === "p" || k.name === "enter") { openUrl(this.link); app.toast("Открываю корзину ВкусВилла — оплата там"); }
     if (h === "y" || h === "c") copy(this.link).then(() => app.toast("Ссылка скопирована"));
+    if (h === "z" && this.switch) { this.half = !this.half; app.invalidate(); }
   }
 
-  hints() { return this.link ? [["p", "оплатить в браузере"], ["y", "скопировать"], ["esc", "закрыть"]] : [["esc", "закрыть"]]; }
+  hints() {
+    if (!this.link) return [["esc", "закрыть"]];
+    return [["p", "оплатить в браузере"], ["y", "скопировать"], ...(this.switch ? [["z", this.switch]] : []), ["esc", "закрыть"]];
+  }
 
-  draw(g, app) {
-    const qs = this.link ? G.qrSize(this.link) : { w: 33, h: 17 };
-    const w = Math.min(g.w - 2, Math.max(qs.w + 6, 64));
-    const compact = qs.h + 10 > g.h - 2;
-    const h = Math.min(g.h - 2, compact ? qs.h + 4 : qs.h + 10);
+  // A dialog of w×h centred on the screen
+  frame(g, app, w, h) {
+    w = Math.min(g.w - 2, w);
+    h = Math.min(g.h - 2, h);
     const x = Math.floor((g.w - w) / 2), y = Math.max(1, Math.floor((g.h - h) / 2));
     shadow(g, x, y, w, h);
     g.box(x, y, w, h, { fg: T.lineHi, bg: T.panel2, title: "Оформление", titleFg: T.lime, style: "round" });
     app.hit(x, y, w, h, { click: () => {} });
-    if (this.error) {
-      g.textC(x, w, y + Math.floor(h / 2) - 1, "⚠ Не получилось создать корзину", { fg: T.red, bold: true, bg: T.panel2 });
-      g.textC(x, w, y + Math.floor(h / 2), this.error, { fg: T.sub, bg: T.panel2 });
-      return;
-    }
+    return { x, y, w, h };
+  }
+
+  draw(g, app) {
     if (!this.link) {
-      g.textC(x, w, y + Math.floor(h / 2) - 1, "Собираю корзину…", { fg: T.sub, bg: T.panel2 });
+      const { x, y, w, h } = this.frame(g, app, 64, 8);
+      const my = y + Math.floor(h / 2);
+      if (this.error) {
+        g.textC(x, w, my - 1, "⚠ Не получилось создать корзину", { fg: T.red, bold: true, bg: T.panel2 });
+        g.textC(x, w, my, this.error, { fg: T.sub, bg: T.panel2 });
+        return;
+      }
+      g.textC(x, w, my - 1, "Собираю корзину…", { fg: T.sub, bg: T.panel2 });
       const n = 20;
-      for (let i = 0; i < n; i++) g.text(x + Math.floor((w - n) / 2) + i, y + Math.floor(h / 2) + 1, " ", { bg: ramp([T.greenD, T.lime, T.greenD], ((i + app.frame) % n) / n) });
+      for (let i = 0; i < n; i++) g.text(x + Math.floor((w - n) / 2) + i, my + 1, " ", { bg: ramp([T.greenD, T.lime, T.greenD], ((i + app.frame) % n) / n) });
       return;
     }
-    const qx = x + Math.floor((w - qs.w) / 2);
-    if (compact) {
-      if (qs.h + 4 <= h) g.qr(qx, y + 1, this.link);
-      else g.textC(x, w, y + 3, "окно мало для QR-кода — растяните терминал", { fg: T.dim, bg: T.panel2 });
+    // The code of filled cells scans in any terminal, so it goes first: in a dialog, or alone with the link over the
+    // whole screen. The half-size code of ▄ is for smaller windows, and `z` switches between the two when both fit.
+    // When neither fits, the size the window needs.
+    const qs = G.qrSize(this.link), hs = G.qrSize(this.link, true);
+    const big = qs.w + 6 <= g.w - 2 && qs.h + 10 <= g.h - 2 ? "dialog" : qs.w <= g.w && qs.h + 1 <= g.h ? "screen" : null;
+    const small = hs.w + 6 <= g.w - 2 && hs.h + 10 <= g.h - 2 ? "dialog" : hs.w + 4 <= g.w - 2 && hs.h + 4 <= g.h - 2 ? "compact" : null;
+    const half = big && small ? !!this.half : !big;
+    this.switch = big && small ? (half ? "крупнее" : "мельче") : null;
+    const layout = half ? small : big;
+    if (layout === "dialog") return this.drawDialog(g, app, half ? hs : qs, half);
+    if (layout === "screen") {
+      g.fill(0, 0, g.w, g.h, T.bg);
+      app.hit(0, 0, g.w, g.h, { click: () => {} });
+      const qy = Math.floor((g.h - qs.h - 1) / 2);
+      g.qr(Math.floor((g.w - qs.w) / 2), qy, this.link);
+      // The link, and the switch after it when the line has room
+      const sw = this.switch && `z  ${this.switch}`;
+      const link = truncate(this.link, g.w - 2), lw = strWidth(link);
+      const both = sw && lw + 3 + strWidth(sw) <= g.w - 2;
+      const lx = Math.floor((g.w - (both ? lw + 3 + strWidth(sw) : lw)) / 2);
+      g.text(lx, qy + qs.h, link, { fg: T.lime, underline: true, bg: T.bg });
+      app.hit(lx, qy + qs.h, lw, 1, { click: () => openUrl(this.link) });
+      if (both) {
+        g.text(lx + lw + 3, qy + qs.h, sw, { fg: T.dim, bg: T.bg });
+        app.hit(lx + lw + 3, qy + qs.h, strWidth(sw), 1, { click: () => { this.half = !this.half; app.invalidate(); } });
+      }
+      return;
+    }
+    if (layout === "compact") {
+      const { x, y, w, h } = this.frame(g, app, Math.max(hs.w + 6, 64), hs.h + 4);
+      g.qr(x + Math.floor((w - hs.w) / 2), y + 1, this.link, true);
       g.textC(x, w, y + h - 3, truncate(this.link, w - 4), { fg: T.lime, underline: true, bg: T.panel2 });
+      app.hit(x + 2, y + h - 3, w - 4, 1, { click: () => openUrl(this.link) });
       g.textC(x, w, y + h - 2, `${rub(store.total)} · камера телефона → приложение ВкусВилла`, { fg: T.dim, bg: T.panel2 });
       return;
     }
-    g.qr(qx, y + 2, this.link);
+    const { x, y, w } = this.frame(g, app, 64, 7);
+    g.textC(x, w, y + 2, `Окно мало для QR-кода: нужно ${hs.w + 6}×${hs.h + 6}, сейчас ${g.w}×${g.h}`, { fg: T.sub, bg: T.panel2 });
+    g.textC(x, w, y + 3, truncate(this.link, w - 4), { fg: T.lime, underline: true, bg: T.panel2 });
+    app.hit(x + 2, y + 3, w - 4, 1, { click: () => openUrl(this.link) });
+    g.textC(x, w, y + 4, "p — открыть в браузере · y — скопировать ссылку", { fg: T.dim, bg: T.panel2 });
+  }
+
+  drawDialog(g, app, qs, half) {
+    const { x, y, w, h } = this.frame(g, app, Math.max(qs.w + 6, 64), qs.h + 10);
+    g.qr(x + Math.floor((w - qs.w) / 2), y + 2, this.link, half);
     g.textC(x, w, y + qs.h + 3, "наведите камеру телефона — откроется приложение ВкусВилла", { fg: T.sub, bg: T.panel2 });
     const ly = y + h - 4;
     g.textC(x, w, ly, truncate(this.link, w - 4), { fg: T.lime, underline: true, bg: T.panel2 });
     app.hit(x + 2, ly, w - 4, 1, { click: () => openUrl(this.link) });
     g.textC(x, w, ly + 1, `${store.count} ${plural(store.count, "позиция", "позиции", "позиций")} · ${rub(store.total)} · оплата и доставка — у ВкусВилла`, { fg: T.dim, bg: T.panel2 });
-    let bx = x + Math.floor((w - 40) / 2);
-    const btn = (label, fn, prim) => { g.pill(bx, ly + 2, label, { fg: prim ? T.bg : T.sub, bg: prim ? T.lime : T.raise, bold: prim }); app.hit(bx, ly + 2, strWidth(label) + 2, 1, { click: fn }); bx += strWidth(label) + 3; };
-    btn("p  оплатить", () => openUrl(this.link), true);
-    btn("y  скопировать", () => copy(this.link).then(() => app.toast("Ссылка скопирована")));
-    btn("esc", () => app.closeOverlay(this));
+    const btns = [
+      ["p  оплатить", () => openUrl(this.link), true],
+      ["y  скопировать", () => copy(this.link).then(() => app.toast("Ссылка скопирована"))],
+      ...(this.switch ? [[`z  ${this.switch}`, () => { this.half = !this.half; app.invalidate(); }]] : []),
+      ["esc", () => app.closeOverlay(this)],
+    ];
+    let bx = x + Math.floor((w - btns.reduce((n, [label]) => n + strWidth(label) + 3, -1)) / 2);
+    for (const [label, fn, prim] of btns) {
+      g.pill(bx, ly + 2, label, { fg: prim ? T.bg : T.sub, bg: prim ? T.lime : T.raise, bold: prim });
+      app.hit(bx, ly + 2, strWidth(label) + 2, 1, { click: fn });
+      bx += strWidth(label) + 3;
+    }
   }
 }
 
