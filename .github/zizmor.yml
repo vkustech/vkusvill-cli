@@ -1,0 +1,11 @@
+# zizmor policy.
+#
+# Tag refs are allowed for the first-party publishers we trust to move a tag responsibly; everything else must be
+# pinned by hash, which is where an unreviewed tag move actually hurts.
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        actions/*: ref-pin
+        github/*: ref-pin
+        "*": hash-pin
