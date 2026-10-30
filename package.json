@@ -1,6 +1,6 @@
 {
   "name": "vkusvill",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Experimental VkusVill client for the terminal, one example of what VkusVill's official MCP server makes possible: catalog, deals, recipes, shops and a cart with a QR code, drawn in text graphics",
   "author": "Anton Golub <golub.anton@gmail.com>",
   "repository": {
