@@ -1,3 +1,8 @@
+## [0.1.2](https://github.com/vkustech/vkusvill-cli/compare/v0.1.1...v0.1.2) (2026-11-01)
+
+### Fixes & improvements
+* perf: key nav imprs (#3) ([2b63793](https://github.com/vkustech/vkusvill-cli/commit/2b637930fe09e080ea5e57bfbb82d7633d26a49c))
+
 ## [0.1.1](https://github.com/vkustech/vkusvill-cli/compare/v0.1.0...v0.1.1) (2026-10-30)
 
 ### Fixes & improvements
