@@ -164,6 +164,15 @@ export class App {
     return true;
   }
 
+  // Back to the first page of a tab; true when something was closed
+  toRoot(id = this.tab) {
+    const s = this.stacks[id];
+    if (s.length < 2) return false;
+    while (s.length > 1) s.pop().onHide?.();
+    if (id === this.tab) this.page.onShow?.();
+    return true;
+  }
+
   toggleCompare(p) {
     if (this.compare.has(p.id)) {
       this.compare.delete(p.id);
@@ -210,23 +219,28 @@ export class App {
     this.invalidate();
   }
 
+  // Coming down from the header lands on the tab's list, as when the tab is reached with ← →.
+  // When a product was closed on the way, focus stays on its row in the list, not in the search box
   leaveHeader() {
     this.headerFocus = false;
-    this.page.focusTop?.();
+    const closed = this.toRoot() || this.closedTab === this.tab;
+    this.closedTab = null;
+    if (!closed) this.page.focusTop?.();
     this.invalidate();
   }
 
   headerKey(ev) {
     const items = this.headerItems();
     const k = ev.hot ?? ev.name;
-    const move = (d) => {
+    // Walking the header with arrows shows each tab from its list: a product left open there is closed
+    const move = (d, root = false) => {
       this.headerSel = (this.headerSel + d + items.length) % items.length;
       const id = items[this.headerSel];
-      if (id !== "auth") this.switchTab(id);
+      if (id !== "auth") { if (root && this.toRoot(id)) this.closedTab = id; this.switchTab(id); }
       this.invalidate();
     };
-    if (ev.name === "left" || (k === "h" && !ev.ctrl)) return move(-1), true;
-    if (ev.name === "right" || (k === "l" && !ev.ctrl)) return move(1), true;
+    if (ev.name === "left" || (k === "h" && !ev.ctrl)) return move(-1, true), true;
+    if (ev.name === "right" || (k === "l" && !ev.ctrl)) return move(1, true), true;
     if (ev.name === "up") return true;
     // Digits and Tab switch tabs as everywhere, staying in the header
     const n = Number(ev.ch);
