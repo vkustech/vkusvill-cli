@@ -179,6 +179,7 @@ await test("a product page scrolls first, then hands ↑ to the header", () => {
   press("1", { ch: "1" });
   press("down");
   const p = normalize({ id: 1, name: "Творог 5%, 180 г", price: { current: 112 }, unit: "шт", description: "Творог для завтраков и выпечки. ".repeat(120) });
+  app.page.focus = "list"; // a product is opened from its row
   app.push(productView(app, p));
   app.render();
   press("down"); press("down");
@@ -189,6 +190,24 @@ await test("a product page scrolls first, then hands ↑ to the header", () => {
   assert.equal(app.headerFocus, true);
   press("escape");
   assert.equal(app.headerFocus, false);
+  assert.equal(app.stacks.catalog.length, 1, "coming down from the header closes the product");
+  assert.equal(app.page.focus, "list", "back on the product's row");
+});
+await test("← → in the header show a tab from its list", () => {
+  const p = normalize({ id: 3, name: "Кефир, 1 л", price: { current: 90 }, unit: "шт" });
+  app.push(productView(app, p));
+  press("up");
+  assert.equal(app.headerFocus, true);
+  press("right");
+  press("left");
+  assert.equal(app.tab, "catalog");
+  assert.equal(app.stacks.catalog.length, 1);
+  press("down");
+  assert.equal(app.page.focus, "list");
+  app.focusHeader();
+  press("down");
+  assert.equal(app.page.focus, "search", "with nothing to close ↓ goes to the top of the page");
+  press("escape");
 });
 await test("→ opens a recipe, ← comes back to the list", () => {
   press("3", { ch: "3" });
@@ -213,9 +232,7 @@ await test("on a product page ← turns photos back first, then returns to the l
   assert.equal(app.stacks.catalog.length, 1);
 });
 await test("a letter typed in the header leaves it and goes to the page", () => {
-  app.pop();
-  press("up");
-  assert.equal(app.headerFocus, true);
+  app.focusHeader();
   press("с", { ch: "с", hot: "c" });
   assert.equal(app.headerFocus, false);
 });
